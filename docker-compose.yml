@@ -1,0 +1,172 @@
+# PetPal Docker Compose Configuration
+# 一键部署完整应用栈
+
+version: '3.8'
+
+services:
+  # ==================== 后端服务 ====================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: petpal-backend
+    restart: unless-stopped
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=mysql+pymysql://${MYSQL_USER:-petpal}:${MYSQL_PASSWORD:-petpal123}@mysql:3306/${MYSQL_DATABASE:-petpal}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - ALIYUN_SMS_ACCESS_KEY_ID=${ALIYUN_SMS_ACCESS_KEY_ID}
+      - ALIYUN_SMS_ACCESS_KEY_SECRET=${ALIYUN_SMS_ACCESS_KEY_SECRET}
+      - OSS_ACCESS_KEY_ID=${OSS_ACCESS_KEY_ID}
+      - OSS_ACCESS_KEY_SECRET=${OSS_ACCESS_KEY_SECRET}
+      - OSS_BUCKET_NAME=${OSS_BUCKET_NAME}
+      - OSS_ENDPOINT=${OSS_ENDPOINT:-oss-cn-hangzhou.aliyuncs.com}
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - petpal-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==================== Celery Worker ====================
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: petpal-celery-worker
+    restart: unless-stopped
+    command: celery -A app.celery_app worker -l info -c 4
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=mysql+pymysql://${MYSQL_USER:-petpal}:${MYSQL_PASSWORD:-petpal123}@mysql:3306/${MYSQL_DATABASE:-petpal}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
+    depends_on:
+      - backend
+      - redis
+    networks:
+      - petpal-network
+
+  # ==================== Celery Beat ====================
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: petpal-celery-beat
+    restart: unless-stopped
+    command: celery -A app.celery_app beat -l info
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=mysql+pymysql://${MYSQL_USER:-petpal}:${MYSQL_PASSWORD:-petpal123}@mysql:3306/${MYSQL_DATABASE:-petpal}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      - celery-worker
+    networks:
+      - petpal-network
+
+  # ==================== 前端服务 ====================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=/api
+    container_name: petpal-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - backend
+    networks:
+      - petpal-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==================== MySQL数据库 ====================
+  mysql:
+    image: mysql:8.0
+    container_name: petpal-mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-petpal}
+      - MYSQL_USER=${MYSQL_USER:-petpal}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-petpal123}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    networks:
+      - petpal-network
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ==================== Redis缓存 ====================
+  redis:
+    image: redis:7-alpine
+    container_name: petpal-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - petpal-network
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# ==================== 网络配置 ====================
+networks:
+  petpal-network:
+    driver: bridge
+
+# ==================== 数据卷 ====================
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  backend_uploads:
+    driver: local
+  backend_logs:
+    driver: local

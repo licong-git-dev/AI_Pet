@@ -1,0 +1,56 @@
+# FastAPI核心
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+python-dotenv==1.0.0
+starlette==0.35.1  # 中间件支持
+
+# 数据库
+sqlalchemy==2.0.25
+pymysql==1.1.0
+alembic==1.13.1
+redis==5.0.1
+
+# 认证与安全
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+pydantic[email]==2.5.3
+pydantic-settings==2.1.0
+bleach==6.1.0  # XSS过滤
+
+# 图形验证码
+captcha==0.5.0  # 图形验证码生成
+pillow==10.2.0  # 图片处理
+
+# IP地址与设备解析
+ip2region==2.7.0  # IP地址转地区
+user-agents==2.2.0  # 设备信息解析
+
+# 文件安全（可选，用于增强MIME类型检测）
+python-magic==0.4.27; sys_platform != 'win32'  # Linux/Mac文件类型检测
+python-magic-bin==0.4.14; sys_platform == 'win32'  # Windows文件类型检测
+
+# 异步任务
+celery==5.3.4
+
+# AI相关
+openai==1.10.0
+httpx==0.26.0
+dashscope==1.14.1  # 阿里云通义千问
+
+# 阿里云服务
+alibabacloud-dysmsapi20170525==2.0.24  # 阿里云短信服务
+alibabacloud-tea-openapi==0.3.8
+oss2==2.18.4  # 阿里云OSS
+
+# 工具
+python-dateutil==2.8.2
+aiofiles==23.2.1
+
+# 日志
+loguru==0.7.2
+
+# 测试
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-cov==4.1.0  # 代码覆盖率
