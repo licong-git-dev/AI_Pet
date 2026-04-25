@@ -10,6 +10,18 @@ from app.schemas.health import (
     ConsultationRequest, ConsultationMessageRequest,
     CreateHealthRecordRequest
 )
+from app.schemas.memory import (
+    CreateMemoryRequest, UpdateMemoryRequest, RetrieveMemoryRequest,
+    MemoryResponse, MemoryGardenStats, MemoryDigestResponse,
+)
+from app.schemas.owner_profile import (
+    OwnerProfileResponse, UpdateProfileRequest as UpdateOwnerProfileRequest,
+    PauseLearningRequest, RecordSignalRequest,
+)
+from app.schemas.device import (
+    StartPairingRequest, StartPairingResponse,
+    ConfirmPairingRequest, HeartbeatRequest, DeviceBindingResponse,
+)
 
 __all__ = [
     "SendCodeRequest", "LoginRequest", "LoginResponse", "RegisterRequest",
@@ -17,5 +29,12 @@ __all__ = [
     "CreatePetRequest", "UpdatePetRequest", "PetResponse",
     "CreatePostRequest", "UpdatePostRequest", "CreateCommentRequest", "PostResponse",
     "HealthAnalysisRequest", "HealthAnalysisResponse",
-    "ConsultationRequest", "ConsultationMessageRequest", "CreateHealthRecordRequest"
+    "ConsultationRequest", "ConsultationMessageRequest", "CreateHealthRecordRequest",
+    # 三大支柱
+    "CreateMemoryRequest", "UpdateMemoryRequest", "RetrieveMemoryRequest",
+    "MemoryResponse", "MemoryGardenStats", "MemoryDigestResponse",
+    "OwnerProfileResponse", "UpdateOwnerProfileRequest",
+    "PauseLearningRequest", "RecordSignalRequest",
+    "StartPairingRequest", "StartPairingResponse",
+    "ConfirmPairingRequest", "HeartbeatRequest", "DeviceBindingResponse",
 ]

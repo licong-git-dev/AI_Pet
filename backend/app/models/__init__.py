@@ -17,6 +17,9 @@ from app.models.login_log import LoginLog
 from app.models.audit_log import AuditLog, AuditAction, AuditResource
 from app.models.user_settings import UserSettings, UserBlacklist, UserAddress, UserFeedback, UserReport
 from app.models.avatar import PetAvatar, PetAvatarChat, PetAvatarMessage, PetSticker, PersonalityProfile
+from app.models.memory import PetMemory, MemoryDigest
+from app.models.owner_profile import OwnerProfile, OwnerSignal
+from app.models.device import DeviceBinding
 
 __all__ = [
     "User",
@@ -32,4 +35,7 @@ __all__ = [
     "AuditLog", "AuditAction", "AuditResource",
     "UserSettings", "UserBlacklist", "UserAddress", "UserFeedback", "UserReport",
     "PetAvatar", "PetAvatarChat", "PetAvatarMessage", "PetSticker", "PersonalityProfile",
+    "PetMemory", "MemoryDigest",
+    "OwnerProfile", "OwnerSignal",
+    "DeviceBinding",
 ]

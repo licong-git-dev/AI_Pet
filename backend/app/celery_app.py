@@ -21,7 +21,8 @@ celery_app = Celery(
         "app.tasks.user",
         "app.tasks.content",
         "app.tasks.notification",
-        "app.tasks.avatar"
+        "app.tasks.avatar",
+        "app.tasks.profile_builder",
     ]
 )
 
@@ -119,6 +120,23 @@ celery_app.conf.update(
             "task": "app.tasks.content.update_activity_status",
             "schedule": crontab(minute="*/10"),  # 每10分钟
             "options": {"queue": "content"}
+        },
+
+        # ==================== 分身：记忆 + 画像 ====================
+        "decay-memories": {
+            "task": "app.tasks.profile_builder.decay_memories",
+            "schedule": crontab(hour=3, minute=30),  # 每日 03:30
+            "options": {"queue": "avatar"}
+        },
+        "rebuild-owner-profiles": {
+            "task": "app.tasks.profile_builder.rebuild_all_profiles",
+            "schedule": crontab(hour=4, minute=0),  # 每日 04:00
+            "options": {"queue": "avatar"}
+        },
+        "weekly-memory-digest": {
+            "task": "app.tasks.profile_builder.weekly_digest_all",
+            "schedule": crontab(hour=6, minute=0, day_of_week=1),  # 每周一 06:00
+            "options": {"queue": "avatar"}
         },
     },
 

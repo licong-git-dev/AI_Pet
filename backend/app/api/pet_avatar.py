@@ -25,6 +25,7 @@ from app.schemas.pet_avatar import (
 from app.utils.deps import get_current_user
 from app.utils.response import success, page_response
 from app.config import settings as app_settings
+from app.services import avatar_chat_pipeline
 from app.services.pet_avatar_service import (
     analyze_pet_appearance,
     generate_personality_analysis,
@@ -316,6 +317,16 @@ async def chat_with_pet(
     breed_data = _get_breed_info_dict(breed) if breed else None
     system_prompt = build_pet_chat_system_prompt(avatar.to_dict(), pet_info, breed_data)
 
+    # 注入长期记忆 + 主人画像（三大支柱集成点）
+    try:
+        prelude = avatar_chat_pipeline.build_chat_prelude(
+            db, avatar=avatar, user=current_user, query=request.message,
+        )
+        if prelude:
+            system_prompt = system_prompt + prelude
+    except Exception as e:
+        logger.warning(f"对话 prelude 失败（已忽略）: {e}")
+
     # 调用AI（异常时返回友好回复而非 500）
     try:
         ai_reply = await chat_as_pet(system_prompt, messages, request.message)
@@ -344,6 +355,20 @@ async def chat_with_pet(
     avatar.chat_count = (avatar.chat_count or 0) + 1
 
     db.commit()
+
+    # 三大支柱集成：写入新记忆 + 记录信号 + 广播 ASP 事件
+    try:
+        await avatar_chat_pipeline.post_chat_hook(
+            db,
+            avatar=avatar,
+            user=current_user,
+            user_message=request.message,
+            assistant_message=ai_reply,
+            chat_id=chat.id,
+            message_id=ai_msg.id,
+        )
+    except Exception as e:
+        logger.warning(f"对话 post_hook 失败（已忽略）: {e}")
 
     return success(data={
         "reply": ai_reply,

@@ -2,7 +2,11 @@
 PetPal - API路由初始化
 """
 from fastapi import APIRouter
-from app.api import auth, users, pets, posts, health, shop, points, diagnosis, upload, messages, activities, payments, search, pet_avatar, membership
+from app.api import (
+    auth, users, pets, posts, health, shop, points, diagnosis, upload,
+    messages, activities, payments, search, pet_avatar, membership,
+    memory, owner_profile, devices,
+)
 from app.api.admin import admin_router
 
 api_router = APIRouter()
@@ -23,6 +27,11 @@ api_router.include_router(activities.router, prefix="/activities", tags=["线下
 api_router.include_router(payments.router, prefix="/payments", tags=["支付"])
 api_router.include_router(search.router, prefix="/search", tags=["搜索"])
 api_router.include_router(pet_avatar.router, prefix="/pet-avatar", tags=["宠物数字分身"])
+
+# ==================== 三大支柱 ====================
+api_router.include_router(memory.router, prefix="/memory", tags=["长期记忆"])
+api_router.include_router(owner_profile.router, prefix="/owner-profile", tags=["主人画像"])
+api_router.include_router(devices.router, prefix="/devices", tags=["设备绑定"])
 
 # 注册管理后台路由
 api_router.include_router(admin_router, prefix="/admin", tags=["管理后台"])
