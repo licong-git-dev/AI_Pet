@@ -81,9 +81,9 @@ async def post_chat_hook(
     2. 记录主人信号（消息行为 + 情感）
     3. 广播 ASP 事件给所有已绑定设备
     """
-    # 1. 抽取记忆
+    # 1. 抽取记忆（优先用 LLM，失败自动降级到规则版）
     try:
-        mem_data = memory_service.extract_memory_from_message(
+        mem_data = await memory_service.extract_memory_from_message_llm(
             user_message=user_message, assistant_message=assistant_message,
         )
         if mem_data:

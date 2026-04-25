@@ -23,6 +23,7 @@ def rebuild_all_profiles(window_days: int = 30, max_users: int = 5000) -> dict:
     from app.database import SessionLocal
     from app.models.owner_profile import OwnerSignal
     from app.services import owner_profile_service
+    from app.services.llm.sync_helpers import build_profile_sync
 
     db = SessionLocal()
     success_count, fail_count = 0, 0
@@ -37,7 +38,10 @@ def rebuild_all_profiles(window_days: int = 30, max_users: int = 5000) -> dict:
         logger.info(f"[profile_builder] {len(user_ids)} active users in last {window_days}d")
         for uid in user_ids:
             try:
-                owner_profile_service.build_profile(db, user_id=uid, window_days=window_days)
+                owner_profile_service.build_profile(
+                    db, user_id=uid, window_days=window_days,
+                    llm_summarize=build_profile_sync,
+                )
                 db.commit()
                 success_count += 1
             except Exception as e:
@@ -73,6 +77,7 @@ def weekly_digest_all(max_avatars: int = 10000) -> dict:
     from app.database import SessionLocal
     from app.models.memory import PetMemory
     from app.services import memory_service
+    from app.services.llm.sync_helpers import summarize_memories_sync
 
     db = SessionLocal()
     built, skipped = 0, 0
@@ -95,7 +100,8 @@ def weekly_digest_all(max_avatars: int = 10000) -> dict:
         for avatar_id, user_id, _ in rows:
             try:
                 d = memory_service.build_weekly_digest(
-                    db, pet_avatar_id=avatar_id, user_id=user_id
+                    db, pet_avatar_id=avatar_id, user_id=user_id,
+                    llm_summarize=summarize_memories_sync,
                 )
                 db.commit()
                 built += 1 if d else 0

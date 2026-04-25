@@ -99,12 +99,59 @@ def write_memory(
     return mem
 
 
+async def extract_memory_from_message_llm(
+    *, user_message: str, assistant_message: str
+) -> Optional[Dict[str, Any]]:
+    """
+    LLM 版"对话→记忆"抽取。
+    优先调用配置的 LLM，失败时自动降级到规则版。
+    返回 None 表示不值得形成长期记忆（LLM 显式 keep=false 或规则未触发）。
+    """
+    try:
+        from app.services.llm import get_llm, prompts
+        llm = get_llm()
+        if not getattr(llm, "is_available", False):
+            return extract_memory_from_message(
+                user_message=user_message, assistant_message=assistant_message
+            )
+        msgs = prompts.extract_memory_messages(user_message, assistant_message)
+        data = await llm.complete_json(msgs, temperature=0.2)
+        if not data.get("keep"):
+            return None
+        # 校验并归一化字段
+        importance = max(0, min(10, int(data.get("importance", 5))))
+        emotion = data.get("emotion") or "neutral"
+        intensity = data.get("emotion_intensity")
+        try:
+            intensity = max(0.0, min(1.0, float(intensity))) if intensity is not None else None
+        except (TypeError, ValueError):
+            intensity = None
+        memory_type = data.get("memory_type") or "episodic"
+        if memory_type not in ("episodic", "semantic", "preference", "event"):
+            memory_type = "episodic"
+        content = (data.get("content") or user_message)[:2000]
+        summary = (data.get("summary") or content)[:120]
+        return {
+            "memory_type": memory_type,
+            "content": content,
+            "summary": summary,
+            "importance": importance,
+            "emotion": emotion,
+            "emotion_intensity": intensity,
+        }
+    except Exception as e:
+        logger.warning(f"[memory] LLM 抽取失败，降级到规则版: {e}")
+        return extract_memory_from_message(
+            user_message=user_message, assistant_message=assistant_message
+        )
+
+
 def extract_memory_from_message(
     *, user_message: str, assistant_message: str
 ) -> Optional[Dict[str, Any]]:
     """
     规则兜底版的"对话→记忆"抽取。
-    LLM 接入后可以替换为 LLM 调用，本函数保留作为降级路径。
+    LLM 不可用时使用此函数。
     返回 None 表示这次对话不值得形成长期记忆。
     """
     text = (user_message or "").strip()

@@ -53,12 +53,30 @@ class Settings(BaseSettings):
     # OpenAI配置 (可选)
     openai_api_key: Optional[str] = None
     openai_base_url: str = "https://api.openai.com/v1"
-    openai_model: str = "gpt-3.5-turbo"
+    openai_model: str = "gpt-4o-mini"
+
+    # Google Gemini 配置 (可选)
+    gemini_api_key: Optional[str] = None
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+    gemini_model: str = "gemini-flash-latest"
 
     # 阿里云通义千问配置 (AI诊断功能必须)
     dashscope_api_key: Optional[str] = None  # 必须配置
     dashscope_vl_model: str = "qwen-vl-max"
     dashscope_chat_model: str = "qwen-max"
+
+    # ==================== 通用 LLM 网关配置（记忆抽取 / 周摘要 / 画像构建） ====================
+    # 主提供商，可选: gemini / openai / dashscope
+    llm_primary_provider: str = "gemini"
+    # 失败时自动切换的次级提供商
+    llm_fallback_provider: Optional[str] = "openai"
+    # 单次请求超时
+    llm_timeout_seconds: float = 20.0
+    # 创意度（0-1），低值用于结构化抽取，高值用于摘要
+    llm_default_temperature: float = 0.2
+    llm_summarize_temperature: float = 0.5
+    # 单次最大输出 tokens
+    llm_max_output_tokens: int = 1024
 
     # ==================== 阿里云短信配置 ====================
     aliyun_sms_access_key_id: Optional[str] = None
@@ -212,6 +230,11 @@ class Settings(BaseSettings):
     def ai_diagnosis_enabled(self) -> bool:
         """AI诊断功能是否可用"""
         return bool(self.dashscope_api_key)
+
+    @property
+    def llm_enabled(self) -> bool:
+        """通用 LLM 网关是否可用（任一提供商有 key 即视为可用）"""
+        return bool(self.gemini_api_key or self.openai_api_key or self.dashscope_api_key)
 
 
 @lru_cache()
