@@ -172,7 +172,6 @@ AI_pet/
 │   ├── tests/               # pytest 单元测试
 │   └── requirements.txt
 ├── docker/                  # Docker 相关配置
-├── docs/                    # 设计 & 测试报告
 ├── docker-compose.yml
 ├── DOCKER_DEPLOY.md
 └── CLAUDE.md                # AI 协作指引
