@@ -39,6 +39,10 @@ class Message(Base):
     created_at = Column(DateTime, server_default=func.now(), comment="创建时间")
 
 
+# 兼容别名：websocket 处理器使用 PrivateMessage 这个旧名字
+PrivateMessage = Message
+
+
 class Activity(Base):
     """线下活动表"""
     __tablename__ = "activities"

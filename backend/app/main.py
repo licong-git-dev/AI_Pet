@@ -44,6 +44,20 @@ async def lifespan(app: FastAPI):
         logger.info("[PetPal] Database tables created/verified")
 
     logger.info("[PetPal] WebSocket server enabled")
+
+    # 注入分身渲染编排器的 MQTT 发布器（启用时）
+    try:
+        from app.services.avatar_render import get_orchestrator
+        from app.services.avatar_render.mqtt_publisher import get_publisher
+        publisher = get_publisher()
+        if publisher is not None:
+            get_orchestrator().configure_mqtt_publisher(publisher)
+            logger.info("[PetPal] MQTT publisher wired to AvatarRenderOrchestrator")
+        else:
+            logger.info("[PetPal] MQTT disabled; hologram/desktop_pet drivers will use mock")
+    except Exception as e:
+        logger.warning(f"[PetPal] MQTT 注入失败（已忽略）: {e}")
+
     logger.info("=" * 50)
 
     yield

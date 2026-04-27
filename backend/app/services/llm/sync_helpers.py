@@ -50,6 +50,31 @@ def summarize_memories_sync(memory_objs) -> Optional[Dict[str, Any]]:
         return None
 
 
+def wrapped_compose_sync(*, raw_stats, top_memories, profile=None) -> Optional[Dict[str, Any]]:
+    """
+    供 wrapped_service.build_wrapped 用的 LLM 回调。
+    输入是已经聚合好的统计 dict + top_memories 列表，输出 {intro, secrets, closing}。
+    """
+    llm = get_llm()
+    if not getattr(llm, "is_available", False):
+        return None
+    pet_name = "你的分身"
+    if profile:
+        try:
+            pa = profile.pet_attachment or {}
+            nicknames = pa.get("nicknames") or []
+            if nicknames:
+                pet_name = nicknames[0]
+        except Exception:
+            pass
+    msgs = prompts.wrapped_compose_messages(raw_stats, top_memories, pet_name=pet_name)
+    try:
+        return _run_async(llm.complete_json(msgs, temperature=0.7, max_tokens=2048))
+    except Exception as e:
+        logger.warning(f"[llm.sync_helpers] wrapped compose failed: {e}")
+        return None
+
+
 def build_profile_sync(signal_objs) -> Optional[Dict[str, Any]]:
     """
     供 owner_profile_service.build_profile 用的 LLM 回调。

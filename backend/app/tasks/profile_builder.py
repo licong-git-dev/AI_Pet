@@ -4,7 +4,9 @@ PetPal - 主人画像 + 长期记忆 周期任务
 - rebuild_all_profiles(): 每日重建活跃用户的画像
 - decay_memories(): 每日记忆衰减扫描
 - weekly_digest_all(): 每周一为活跃分身生成周摘要
+- monthly_wrapped(): 每月 1 号为活跃用户生成上月 Wrapped 月报并推送
 """
+import json
 from datetime import datetime, timedelta
 from celery import shared_task
 from loguru import logger
@@ -111,5 +113,85 @@ def weekly_digest_all(max_avatars: int = 10000) -> dict:
                 logger.warning(f"[profile_builder] digest avatar={avatar_id} failed: {e}")
                 db.rollback()
         return {"built": built, "skipped": skipped}
+    finally:
+        db.close()
+
+
+@shared_task(name="app.tasks.profile_builder.monthly_wrapped")
+def monthly_wrapped(max_users: int = 50000) -> dict:
+    """
+    每月 1 号 09:00：为过去一个月有过对话的用户生成 Wrapped 月报，
+    写入一条系统通知（notify_type=system，extra_data 携带月报数据）。
+    """
+    from app.database import SessionLocal
+    from app.models.owner_profile import OwnerSignal
+    from app.models.social import Notification
+    from app.services import wrapped_service
+    from app.services.llm.sync_helpers import wrapped_compose_sync
+
+    db = SessionLocal()
+    sent, skipped = 0, 0
+    try:
+        today = datetime.utcnow()
+        first_of_this_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        last_of_last_month = first_of_this_month - timedelta(days=1)
+        year = last_of_last_month.year
+        month = last_of_last_month.month
+
+        # 仅给上个月有信号的用户生成
+        cutoff_start = datetime(year, month, 1)
+        cutoff_end = first_of_this_month
+        user_ids = [
+            uid for (uid,) in db.query(distinct(OwnerSignal.user_id))
+            .filter(
+                OwnerSignal.recorded_at >= cutoff_start,
+                OwnerSignal.recorded_at < cutoff_end,
+            )
+            .limit(max_users)
+            .all()
+        ]
+        logger.info(f"[wrapped] {len(user_ids)} users active in {year}-{month:02d}")
+
+        for uid in user_ids:
+            try:
+                wrapped = wrapped_service.build_wrapped(
+                    db,
+                    user_id=uid,
+                    year=year,
+                    month=month,
+                    llm_compose=wrapped_compose_sync,
+                )
+                # 太空的月报不推（信号 < 5 视为新用户跳过）
+                if (wrapped.get("stats") or {}).get("total_signals", 0) < 5:
+                    skipped += 1
+                    continue
+
+                pet_name = wrapped.get("pet_name") or "你的分身"
+                title = f"📜 {pet_name} 写给你的 {year}.{month:02d} 月报"
+                content = (wrapped.get("creative") or {}).get("intro") or "我整理好这个月的回忆啦，进来看看～"
+
+                notif = Notification(
+                    user_id=uid,
+                    notify_type="system",
+                    target_type="wrapped",
+                    target_id=year * 100 + month,
+                    title=title,
+                    content=content[:500],
+                    extra_data=json.dumps({
+                        "wrapped_year": year,
+                        "wrapped_month": month,
+                        "card_count": len(wrapped.get("cards") or []),
+                        "secret_count": len((wrapped.get("creative") or {}).get("secrets") or []),
+                    }, ensure_ascii=False),
+                )
+                db.add(notif)
+                db.commit()
+                sent += 1
+            except Exception as e:
+                logger.warning(f"[wrapped] user={uid} failed: {e}")
+                db.rollback()
+                skipped += 1
+
+        return {"year": year, "month": month, "sent": sent, "skipped": skipped}
     finally:
         db.close()

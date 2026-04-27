@@ -24,9 +24,38 @@ from app.schemas.owner_profile import (
 )
 from app.utils.deps import get_current_user
 from app.utils.response import success, page_response
-from app.services import owner_profile_service
+from app.services import owner_profile_service, wrapped_service
 
 router = APIRouter()
+
+
+@router.get("/wrapped")
+def get_wrapped(
+    year: Optional[int] = Query(None, ge=2024, le=2100),
+    month: Optional[int] = Query(None, ge=1, le=12),
+    pet_avatar_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    月度画像月报（Spotify Wrapped 风格）。
+    省略 year/month 时自动取上一个月。
+    """
+    # 用 LLM 生成创意层；失败兜底
+    try:
+        from app.services.llm.sync_helpers import wrapped_compose_sync as composer
+    except Exception:
+        composer = None
+
+    data = wrapped_service.build_wrapped(
+        db,
+        user_id=current_user.id,
+        year=year,
+        month=month,
+        pet_avatar_id=pet_avatar_id,
+        llm_compose=composer,
+    )
+    return success(data=data)
 
 
 @router.get("/me")

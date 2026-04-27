@@ -138,6 +138,11 @@ celery_app.conf.update(
             "schedule": crontab(hour=6, minute=0, day_of_week=1),  # 每周一 06:00
             "options": {"queue": "avatar"}
         },
+        "monthly-wrapped": {
+            "task": "app.tasks.profile_builder.monthly_wrapped",
+            "schedule": crontab(hour=9, minute=0, day_of_month=1),  # 每月 1 号 09:00
+            "options": {"queue": "avatar"}
+        },
     },
 
     # 任务队列配置

@@ -108,6 +108,15 @@ class Settings(BaseSettings):
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
 
+    # ==================== MQTT（桌宠 / 全息设备 fan-out） ====================
+    mqtt_enabled: bool = False
+    mqtt_host: str = "localhost"
+    mqtt_port: int = 1883
+    mqtt_username: Optional[str] = None
+    mqtt_password: Optional[str] = None
+    mqtt_client_id_prefix: str = "petpal-backend"
+    mqtt_keepalive: int = 60
+
     # ==================== 日志配置 ====================
     log_level: str = "INFO"
     log_file: Optional[str] = None

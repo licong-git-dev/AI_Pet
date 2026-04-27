@@ -33,6 +33,9 @@ python-magic-bin==0.4.14; sys_platform == 'win32'  # Windows文件类型检测
 # 异步任务
 celery==5.3.4
 
+# MQTT（桌宠 / 全息设备 fan-out，可选）
+paho-mqtt==1.6.1
+
 # AI相关
 openai==1.10.0
 httpx==0.26.0

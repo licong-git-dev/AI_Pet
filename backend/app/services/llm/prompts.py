@@ -130,6 +130,55 @@ BUILD_PROFILE_SYSTEM = """你是一个负责给宠物分身搭建"主人画像"�
 }"""
 
 
+# ==================== 4. Wrapped 月报创意层 ====================
+
+WRAPPED_COMPOSE_SYSTEM = """你是宠物的"数字分身"，正在给主人写一份月度月报（类似 Spotify Wrapped）。
+
+写作风格：
+- 第一人称（"我""我们"），用宠物可爱的口吻
+- 温暖但不腻，不要喊口号、不要营销腔
+- 每条"秘密"都要基于给定数据，不能杜撰具体事件
+- 每条"秘密"40-80 字之间，要让主人有"啊原来你都知道"的小感动
+
+严格按以下 JSON 格式返回（不要 ```json 围栏）：
+{
+  "intro": "100-150 字，宠物口吻的开场白，自然提到月份和我们一起度过的关键氛围",
+  "secrets": [
+    "秘密1（基于数据）",
+    "秘密2（基于数据）",
+    "秘密3（基于数据）",
+    "秘密4（基于数据）",
+    "秘密5（基于数据）"
+  ],
+  "closing": "60-100 字，温柔的结语，承诺下个月继续陪伴"
+}"""
+
+
+def wrapped_compose_messages(stats: Dict[str, Any], top_memories: List[Dict[str, Any]],
+                             pet_name: str = "你的分身") -> List[Dict[str, Any]]:
+    user_block = (
+        f"宠物分身的名字：{pet_name}\n"
+        f"月份：{stats.get('year')}年{stats.get('month')}月\n\n"
+        f"统计数据：\n"
+        f"- 见面天数：{stats.get('active_days')}\n"
+        f"- 聊天次数：{stats.get('chat_count')}\n"
+        f"- 形成的长期记忆数：{stats.get('memory_count')}\n"
+        f"- 主人主动置顶的记忆：{stats.get('pinned_memories')}\n"
+        f"- 里程碑事件数：{stats.get('milestone_count')}\n"
+        f"- 主导情绪：{stats.get('dominant_emotion')}\n"
+        f"- 情绪分布：{stats.get('emotion_distribution')}\n"
+        f"- 主人最常活跃的小时：{stats.get('peak_active_hours')}\n\n"
+        f"高重要度记忆（按重要度降序）：\n"
+    )
+    for i, m in enumerate(top_memories or [], 1):
+        user_block += f"{i}. [{m.get('type')}|imp={m.get('importance')}|{m.get('emotion')}] {m.get('summary')}\n"
+    user_block += "\n请按 system 中的格式返回 JSON。"
+    return [
+        {"role": "system", "content": WRAPPED_COMPOSE_SYSTEM},
+        {"role": "user", "content": user_block},
+    ]
+
+
 def build_profile_messages(signals: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """signals: [{signal_type, recorded_at, sentiment_label, text_excerpt, payload}, ...]"""
     lines = [f"以下是过去 30 天采集的 {len(signals)} 条信号（按时间从新到旧，节选）："]
