@@ -18,6 +18,12 @@ from app.services.avatar_render.drivers import (
     WebRenderer, HologramRenderer, DesktopPetRenderer,
 )
 
+try:
+    from app.utils.metrics import observe_asp_broadcast, asp_drivers_active
+except Exception:
+    def observe_asp_broadcast(*a, **k): pass  # type: ignore
+    asp_drivers_active = None  # type: ignore
+
 
 class AvatarRenderOrchestrator:
     """全局唯一编排器（进程内单例）"""
@@ -57,6 +63,8 @@ class AvatarRenderOrchestrator:
             r = self._build_renderer(device_type, device_id, capabilities)
             if r:
                 self._renderers[key] = r
+                if asp_drivers_active:
+                    asp_drivers_active.set(len(self._renderers))
         return r
 
     # -------- 主入口 --------
@@ -113,6 +121,7 @@ class AvatarRenderOrchestrator:
                     failed += 1
 
         logger.info(f"[orchestrator] avatar={event.avatar_id} type={event.type} sent={sent} failed={failed} skipped={skipped}")
+        observe_asp_broadcast(event.type, sent=sent, failed=failed, skipped=skipped)
         return {"sent": sent, "failed": failed, "skipped": skipped}
 
 

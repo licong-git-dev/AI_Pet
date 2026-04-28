@@ -25,6 +25,11 @@ from app.models.memory import PetMemory, MemoryDigest
 from app.models.owner_profile import OwnerProfile, OwnerSignal
 from app.models.avatar import PetAvatar
 
+try:
+    from app.utils.metrics import observe_wrapped
+except Exception:
+    def observe_wrapped(*a, **k): pass  # type: ignore
+
 
 # ==================== 工具 ====================
 
@@ -163,9 +168,11 @@ def build_wrapped(
 
     # ---------- 6. LLM 创意层 ----------
     creative = None
+    llm_used = False
     if llm_compose is not None:
         try:
             creative = llm_compose(raw_stats=raw_stats, top_memories=top_memory_payload, profile=profile)
+            llm_used = bool(creative)
         except Exception as e:
             logger.warning(f"[wrapped] llm_compose failed: {e}")
     if not creative:
@@ -179,6 +186,10 @@ def build_wrapped(
         creative=creative,
         digests=digests,
     )
+
+    secrets_count = len((creative or {}).get("secrets") or [])
+    outcome = "ok" if (raw_stats["total_signals"] >= 5 and len(cards) >= 5) else "empty"
+    observe_wrapped(llm_used=llm_used, outcome=outcome, cards=len(cards), secrets=secrets_count)
 
     return {
         "year": year,

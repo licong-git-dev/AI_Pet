@@ -24,6 +24,15 @@ from sqlalchemy.orm import Session
 
 from app.models.memory import PetMemory, MemoryDigest
 
+try:
+    from app.utils.metrics import (
+        observe_memory_write, observe_memory_retrieval, observe_extract_decision,
+    )
+except Exception:
+    def observe_memory_write(*a, **k): pass  # type: ignore
+    def observe_memory_retrieval(*a, **k): pass  # type: ignore
+    def observe_extract_decision(*a, **k): pass  # type: ignore
+
 
 # ==================== 衰减参数 ====================
 
@@ -96,6 +105,7 @@ def write_memory(
     db.add(mem)
     db.flush()
     logger.info(f"[memory] write avatar={pet_avatar_id} type={memory_type} importance={importance} id={mem.id}")
+    observe_memory_write(memory_type, source, importance)
     return mem
 
 
@@ -111,12 +121,15 @@ async def extract_memory_from_message_llm(
         from app.services.llm import get_llm, prompts
         llm = get_llm()
         if not getattr(llm, "is_available", False):
-            return extract_memory_from_message(
+            result = extract_memory_from_message(
                 user_message=user_message, assistant_message=assistant_message
             )
+            observe_extract_decision(kept=bool(result), extractor="rule")
+            return result
         msgs = prompts.extract_memory_messages(user_message, assistant_message)
         data = await llm.complete_json(msgs, temperature=0.2)
         if not data.get("keep"):
+            observe_extract_decision(kept=False, extractor="llm")
             return None
         # 校验并归一化字段
         importance = max(0, min(10, int(data.get("importance", 5))))
@@ -131,6 +144,7 @@ async def extract_memory_from_message_llm(
             memory_type = "episodic"
         content = (data.get("content") or user_message)[:2000]
         summary = (data.get("summary") or content)[:120]
+        observe_extract_decision(kept=True, extractor="llm")
         return {
             "memory_type": memory_type,
             "content": content,
@@ -141,9 +155,11 @@ async def extract_memory_from_message_llm(
         }
     except Exception as e:
         logger.warning(f"[memory] LLM 抽取失败，降级到规则版: {e}")
-        return extract_memory_from_message(
+        result = extract_memory_from_message(
             user_message=user_message, assistant_message=assistant_message
         )
+        observe_extract_decision(kept=bool(result), extractor="rule")
+        return result
 
 
 def extract_memory_from_message(
@@ -219,6 +235,8 @@ def retrieve_memories(
     v1 用关键词命中 + 重要度 + 新鲜度 + 情感强度组合打分。
     后续可在此函数内替换为向量检索而不改外部接口。
     """
+    import time as _t
+    _t0 = _t.perf_counter()
     q = db.query(PetMemory).filter(
         PetMemory.pet_avatar_id == pet_avatar_id,
         PetMemory.user_id == user_id,
@@ -259,6 +277,7 @@ def retrieve_memories(
             m.recall_count = (m.recall_count or 0) + 1
         db.flush()
 
+    observe_memory_retrieval(_t.perf_counter() - _t0, len(top))
     return top
 
 

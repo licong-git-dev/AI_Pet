@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
+import { computed } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
+import TabBar from '@/components/TabBar.vue'
+
+const route = useRoute()
+const showTabBar = computed(() => !!route.meta.tab)
 </script>
 
 <template>
@@ -9,6 +14,7 @@ import { RouterView } from 'vue-router'
         <component :is="Component" />
       </transition>
     </RouterView>
+    <TabBar v-if="showTabBar" />
   </div>
 </template>
 

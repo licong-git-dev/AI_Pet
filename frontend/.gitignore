@@ -1,5 +1,6 @@
 node_modules/
 dist/
+public/live2d/
 .vite/
 .cache/
 .parcel-cache/

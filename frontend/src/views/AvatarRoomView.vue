@@ -1,10 +1,32 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { useAvatarSocket, makeMockEvent } from '@/composables/useAvatarSocket'
 import AvatarStage from '@/components/AvatarStage.vue'
+// 动态加载，仅在用户启用 Live2D 时才下载 pixi 包
+const Live2DAvatar = defineAsyncComponent(() => import('@/components/Live2DAvatar.vue'))
+
+// Live2D 开关：localStorage 持久化，未配置时走 CSS 兽体
+const LIVE2D_KEY = 'petpal_live2d_url'
+const live2dUrl = ref<string>(localStorage.getItem(LIVE2D_KEY) || '')
+const live2dEnabled = computed(() => !!live2dUrl.value)
+function toggleLive2D() {
+  if (live2dEnabled.value) {
+    live2dUrl.value = ''
+    localStorage.removeItem(LIVE2D_KEY)
+  } else {
+    const url = window.prompt(
+      'Live2D 模型 URL（model3.json）',
+      '/live2d/hiyori/Hiyori.model3.json',
+    )
+    if (url) {
+      live2dUrl.value = url.trim()
+      localStorage.setItem(LIVE2D_KEY, live2dUrl.value)
+    }
+  }
+}
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -98,7 +120,20 @@ function logout() {
     </header>
 
     <main class="main">
-      <AvatarStage :event="stageEvent" />
+      <AvatarStage :event="stageEvent" :live2d-model-url="live2dUrl || undefined">
+        <template #live2d="{ event }">
+          <Live2DAvatar :model-url="live2dUrl" :event="event" />
+        </template>
+      </AvatarStage>
+
+      <section class="emotion-row">
+        <p class="muted">
+          渲染模式：{{ live2dEnabled ? 'Live2D (' + live2dUrl + ')' : 'CSS chibi' }}
+          <button class="link toggle" @click="toggleLive2D">
+            {{ live2dEnabled ? '切回 CSS 兽体' : '启用 Live2D' }}
+          </button>
+        </p>
+      </section>
 
       <section class="emotion-row">
         <p class="muted">情绪预览（本地 mock）：</p>
@@ -161,6 +196,11 @@ function logout() {
 }
 .emotion-row {
   text-align: center;
+  .toggle {
+    margin-left: 8px;
+    background: none; border: none;
+    color: #ff7b1c; font-weight: 600; cursor: pointer;
+  }
   .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 8px; }
   .chip {
     padding: 6px 12px; border-radius: 999px;

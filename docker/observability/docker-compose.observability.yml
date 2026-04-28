@@ -1,0 +1,45 @@
+# PetPal 可观测栈（独立 compose，可与主栈并存）
+# 使用：cd docker/observability && docker compose up -d
+# Prometheus: http://localhost:9090
+# Grafana:    http://localhost:3000  (admin / petpal-grafana)
+#
+# 注：宿主机执行时 prometheus 会以 host.docker.internal 抓取后端 /metrics。
+# 如果后端也在 docker compose 网络里，把 scrape target 换成 backend:8000 即可。
+
+version: "3.8"
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: petpal-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    container_name: petpal-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: petpal-grafana
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+
+volumes:
+  prometheus-data:
+  grafana-data:

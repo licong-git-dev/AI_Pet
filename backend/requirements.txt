@@ -36,6 +36,10 @@ celery==5.3.4
 # MQTT（桌宠 / 全息设备 fan-out，可选）
 paho-mqtt==1.6.1
 
+# 监控
+prometheus-client==0.20.0
+prometheus-fastapi-instrumentator==7.0.0
+
 # AI相关
 openai==1.10.0
 httpx==0.26.0

@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  external_labels:
+    project: petpal
+
+scrape_configs:
+  - job_name: petpal-backend
+    metrics_path: /metrics
+    static_configs:
+      # 默认假设后端在宿主机 8000 端口；compose 同网络时改成 backend:8000
+      - targets: ["host.docker.internal:8000"]
+        labels:
+          service: backend
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

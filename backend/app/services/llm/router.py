@@ -2,7 +2,9 @@
 PetPal - LLM 路由器
 
 主提供商失败时自动降级到 fallback。统一对外暴露 LLMClient 接口。
+所有调用通过 metrics 探针记录 provider/duration/outcome。
 """
+import time
 from typing import Optional, List, Dict, Any
 from loguru import logger
 
@@ -10,6 +12,12 @@ from app.config import settings
 from app.services.llm.base import LLMClient, LLMException
 from app.services.llm.providers.gemini import GeminiClient
 from app.services.llm.providers.openai_like import OpenAIClient
+
+try:
+    from app.utils.metrics import observe_llm_call
+except Exception:  # 监控可选；缺失时退化为 no-op
+    def observe_llm_call(*args, **kwargs):  # type: ignore
+        return None
 
 
 def _build_provider(name: str) -> Optional[LLMClient]:
@@ -77,18 +85,42 @@ class LLMRouter(LLMClient):
         json_mode: bool = False,
     ) -> str:
         last_err: Optional[Exception] = None
-        for provider in (self.primary, self.fallback):
+        # 估算输入字符数（一次即可）
+        try:
+            input_chars = sum(len(getattr(m, "content", None) or m.get("content", "")) for m in messages)
+        except Exception:
+            input_chars = None
+
+        for i, provider in enumerate((self.primary, self.fallback)):
             if provider is None:
                 continue
+            t0 = time.perf_counter()
+            outcome = "success" if i == 0 else "fallback"
             try:
-                return await provider.complete(
+                result = await provider.complete(
                     messages, temperature=temperature, max_tokens=max_tokens, json_mode=json_mode,
                 )
+                observe_llm_call(
+                    provider.name, provider.model,
+                    outcome=outcome, duration=time.perf_counter() - t0,
+                    input_chars=input_chars, output_chars=len(result) if result else 0,
+                )
+                return result
             except LLMException as e:
                 logger.warning(f"[llm] provider={provider.name} 失败: {e}; 尝试下一个")
+                observe_llm_call(
+                    provider.name, provider.model,
+                    outcome="failure", duration=time.perf_counter() - t0,
+                    input_chars=input_chars,
+                )
                 last_err = e
             except Exception as e:
                 logger.warning(f"[llm] provider={provider.name} 未知异常: {e}; 尝试下一个")
+                observe_llm_call(
+                    provider.name, provider.model,
+                    outcome="failure", duration=time.perf_counter() - t0,
+                    input_chars=input_chars,
+                )
                 last_err = e
         if last_err is None:
             raise LLMException("无可用 LLM 提供商，请配置 GEMINI_API_KEY 或 OPENAI_API_KEY")

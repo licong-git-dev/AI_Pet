@@ -1,0 +1,128 @@
+{
+  "uid": "petpal-overview",
+  "title": "PetPal · 三大支柱总览",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["petpal"],
+  "timezone": "browser",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "API QPS（5m 速率）",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "targets": [{ "expr": "sum(rate(http_requests_total[5m]))", "refId": "A" }]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "API 错误率（5xx / total）",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [{
+        "expr": "sum(rate(http_requests_total{status_code=~\"5..\"}[5m])) / clamp_min(sum(rate(http_requests_total[5m])), 0.001)",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "LLM 调用 / 分钟",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "targets": [{ "expr": "sum(rate(petpal_llm_calls_total[5m])) * 60", "refId": "A" }]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "LLM 失败率",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [{
+        "expr": "sum(rate(petpal_llm_calls_total{outcome=\"failure\"}[5m])) / clamp_min(sum(rate(petpal_llm_calls_total[5m])), 0.001)",
+        "refId": "A"
+      }]
+    },
+
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "LLM 调用速率 by provider",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "targets": [{
+        "expr": "sum by(provider) (rate(petpal_llm_calls_total[1m]))",
+        "refId": "A",
+        "legendFormat": "{{provider}}"
+      }]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "LLM p95 延迟（按 provider）",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{
+        "expr": "histogram_quantile(0.95, sum by(provider, le) (rate(petpal_llm_call_duration_seconds_bucket[5m])))",
+        "refId": "A",
+        "legendFormat": "p95 · {{provider}}"
+      }]
+    },
+
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "记忆抽取决策（保留 vs 丢弃）",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "targets": [{
+        "expr": "sum by(decision, extractor) (rate(petpal_memory_extract_decisions_total[5m]))",
+        "refId": "A",
+        "legendFormat": "{{decision}} · {{extractor}}"
+      }]
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "新增记忆类型分布",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "targets": [{
+        "expr": "sum by(memory_type) (rate(petpal_memory_writes_total[5m]))",
+        "refId": "A",
+        "legendFormat": "{{memory_type}}"
+      }]
+    },
+
+    {
+      "id": 30,
+      "type": "stat",
+      "title": "本月已生成 Wrapped",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 21 },
+      "targets": [{
+        "expr": "sum(increase(petpal_wrapped_generated_total{outcome=\"ok\"}[30d]))",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 31,
+      "type": "stat",
+      "title": "Wrapped LLM 命中率",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 21 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [{
+        "expr": "sum(increase(petpal_wrapped_generated_total{llm_used=\"true\"}[30d])) / clamp_min(sum(increase(petpal_wrapped_generated_total[30d])), 0.001)",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "ASP fan-out 速率（按结果）",
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 21 },
+      "targets": [{
+        "expr": "sum by(outcome) (rate(petpal_asp_broadcast_total[1m]))",
+        "refId": "A",
+        "legendFormat": "{{outcome}}"
+      }]
+    }
+  ]
+}

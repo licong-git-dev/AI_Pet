@@ -26,6 +26,14 @@ from app.api import api_router
 from app.websocket import websocket_router
 from app.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
 
+# 监控
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+    _INSTRUMENTATOR_OK = True
+except ImportError:  # 未安装时不阻塞启动
+    Instrumentator = None  # type: ignore
+    _INSTRUMENTATOR_OK = False
+
 # 上传目录配置
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
 
@@ -208,6 +216,23 @@ app.include_router(websocket_router, prefix="/api/v1", tags=["WebSocket"])
 # 静态文件服务（上传文件）
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
+
+# ==================== 监控 / Prometheus ====================
+# 加在路由注册之后、自定义端点之前；这样 /metrics 也走标准管线
+if _INSTRUMENTATOR_OK:
+    try:
+        # 导入一次让指标定义被加载
+        from app.utils import metrics as _petpal_metrics  # noqa: F401
+        Instrumentator(
+            should_group_status_codes=True,
+            excluded_handlers=["/health", "/metrics"],
+        ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+        logger.info("[PetPal] Prometheus metrics enabled at /metrics")
+    except Exception as e:
+        logger.warning(f"[PetPal] Prometheus 启用失败：{e}")
+else:
+    logger.info("[PetPal] prometheus-fastapi-instrumentator 未安装；/metrics 已跳过")
 
 
 # ==================== 基础端点 ====================

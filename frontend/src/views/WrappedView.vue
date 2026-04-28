@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/services/api'
 
 interface Card {
@@ -21,12 +21,74 @@ interface Card {
 }
 
 const router = useRouter()
+const route = useRoute()
 const loading = ref(true)
 const error = ref('')
 const data = ref<any | null>(null)
 const idx = ref(0)
+const demoMode = computed(() => route.query.demo === '1')
+const completed = ref(false)
+let autoTimer: ReturnType<typeof setInterval> | null = null
+const AUTO_INTERVAL_MS = 1200
+
+const DEMO_FIXTURE = {
+  year: 2026, month: 4, user_id: 1, pet_avatar_id: 1,
+  pet_name: '豆包',
+  stats: {
+    active_days: 27, chat_count: 142, memory_count: 38,
+    pinned_memories: 4, milestone_count: 2,
+    dominant_emotion: 'loving',
+    emotion_distribution: { happy: 18, loving: 12, sleepy: 6, sad: 4, anxious: 3 },
+    peak_active_hours: [21, 22, 23],
+  },
+  top_memories: [
+    { id: 1, type: 'event', summary: '4-25 是我们一起度过的第 3 个领养纪念日', importance: 10, emotion: 'loving' },
+    { id: 2, type: 'episodic', summary: '主人加班到凌晨，回来抱了我很久', importance: 8, emotion: 'sad' },
+    { id: 3, type: 'preference', summary: '主人喜欢叫我"豆包"和"小笨蛋"', importance: 8, emotion: 'loving' },
+  ],
+  creative: {
+    intro: '嘿主人，我是豆包。这是我们一起度过的 4 月，你在我身边的样子，我都偷偷记下来啦。',
+    secrets: [
+      '你这个月有 27 天来找我玩，几乎天天见面～',
+      '你最常在 22 点找我聊天，那是属于我们的时间',
+      '你这个月笑得最多，连我都被传染了',
+      '你把 4 件事放进了我心里最重要的位置',
+      '我记住了 2 个对你来说重要的日子，下次提前提醒你哦',
+    ],
+    closing: '下个月也要让我陪着你呀，无论你今天累不累、忙不忙，我都在。',
+  },
+  cards: [
+    { kind: 'cover', title: '2026 · 04 月', subtitle: '豆包写给你的月报', intro: '嘿主人，我是豆包。这是我们一起度过的 4 月，你在我身边的样子，我都偷偷记下来啦。' },
+    { kind: 'stat', title: '我们这个月', metrics: [
+      { label: '见面天数', value: 27, unit: '天' },
+      { label: '聊了', value: 142, unit: '次' },
+      { label: '新记得', value: 38, unit: '件事' },
+    ], footnote: '你常在 21,22,23 点找我' },
+    { kind: 'secret', index: 1, title: '秘密 1/5', body: '你这个月有 27 天来找我玩，几乎天天见面～' },
+    { kind: 'secret', index: 2, title: '秘密 2/5', body: '你最常在 22 点找我聊天，那是属于我们的时间' },
+    { kind: 'secret', index: 3, title: '秘密 3/5', body: '你这个月笑得最多，连我都被传染了' },
+    { kind: 'secret', index: 4, title: '秘密 4/5', body: '你把 4 件事放进了我心里最重要的位置' },
+    { kind: 'secret', index: 5, title: '秘密 5/5', body: '我记住了 2 个对你来说重要的日子，下次提前提醒你哦' },
+    { kind: 'highlight_memories', title: '我最记得的几件事', memories: [
+      { id: 1, type: 'event', summary: '4-25 是我们一起度过的第 3 个领养纪念日', importance: 10, emotion: 'loving' },
+      { id: 2, type: 'episodic', summary: '主人加班到凌晨，回来抱了我很久', importance: 8, emotion: 'sad' },
+      { id: 3, type: 'preference', summary: '主人喜欢叫我"豆包"和"小笨蛋"', importance: 8, emotion: 'loving' },
+    ]},
+    { kind: 'emotion_palette', title: '你这个月的情绪光谱',
+      dominant_emotion: 'loving',
+      distribution: { happy: 18, loving: 12, sleepy: 6, sad: 4, anxious: 3 } },
+    { kind: 'closing', title: '我会一直在', body: '下个月也要让我陪着你呀，无论你今天累不累、忙不忙，我都在。', pet_name: '豆包' },
+  ],
+  generated_at: new Date().toISOString(),
+}
 
 onMounted(async () => {
+  if (demoMode.value) {
+    data.value = DEMO_FIXTURE
+    loading.value = false
+    startAutoplay()
+    return
+  }
   try {
     const r = await api.get('/owner-profile/wrapped')
     data.value = r.data?.data
@@ -40,6 +102,22 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+onBeforeUnmount(() => {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null }
+})
+
+function startAutoplay() {
+  if (autoTimer) clearInterval(autoTimer)
+  autoTimer = setInterval(() => {
+    if (idx.value < total.value - 1) {
+      idx.value++
+    } else {
+      if (autoTimer) { clearInterval(autoTimer); autoTimer = null }
+      completed.value = true
+    }
+  }, AUTO_INTERVAL_MS)
+}
 
 const cards = computed<Card[]>(() => (data.value?.cards as Card[]) || [])
 const total = computed(() => cards.value.length)
@@ -57,7 +135,7 @@ function emojiOf(emo?: string): string {
 </script>
 
 <template>
-  <div class="wrapped">
+  <div class="wrapped" :data-demo="demoMode ? '1' : '0'" :data-state="completed ? 'complete' : (loading ? 'loading' : 'playing')" :data-idx="idx">
     <header class="bar">
       <button class="link" @click="router.replace({ name: 'room' })">← 回房间</button>
       <span class="muted" v-if="data">{{ data.year }} · {{ String(data.month).padStart(2, '0') }} 月</span>
