@@ -21,7 +21,7 @@ def sku_product() -> Product:
 
 
 class Item:
-    def __init__(self, product_id: int, quantity: int, sku_id: int | None, sku_info: str | None = None):
+    def __init__(self, product_id: int, quantity: int, sku_id, sku_info=None):
         self.product_id = product_id
         self.quantity = quantity
         self.sku_id = sku_id

@@ -104,6 +104,42 @@ backend/app/
 
 **配置管理**: `app/config.py` 基于 `pydantic-settings`，从环境变量和 `.env` 文件加载。详见 `.env.example`。生产环境必须配置 `JWT_SECRET_KEY` 和 `SECRET_KEY`。
 
+### 三大支柱（电子分身核心）
+
+详细 PRD 见 [docs/PRODUCT_DESIGN.md](docs/PRODUCT_DESIGN.md)。代码入口：
+
+| 支柱 | 数据 | 服务 | 接口 / 集成点 |
+| --- | --- | --- | --- |
+| 长期记忆 | `models/memory.py` (PetMemory + MemoryDigest) | `services/memory_service.py` | `api/memory.py` 9 端点；对话前后由 `services/avatar_chat_pipeline.py` 自动注入与抽取 |
+| 主人画像 | `models/owner_profile.py` (OwnerProfile + OwnerSignal) | `services/owner_profile_service.py` | `api/owner_profile.py` 7 端点（含 `/wrapped` 月报）；周期重建在 `tasks/profile_builder.py` |
+| 渲染适配层 | `models/device.py` (DeviceBinding) | `services/avatar_render/`（protocol / base / drivers / orchestrator） | `api/devices.py` 6 端点；MQTT publisher 在 `main.py` lifespan 内注入 |
+
+### LLM 网关（`services/llm/`）
+
+为长期记忆抽取 / 周摘要 / 画像构建 / Wrapped 月报创意层提供统一 LLM 接口。
+
+```
+LLMRouter (主→次自动 failover)
+  ├─ GeminiClient (gemini-flash-latest)
+  └─ OpenAIClient (gpt-4o-mini)
+```
+
+- 配置：`app/config.py` 的 `LLM_PRIMARY_PROVIDER` / `LLM_FALLBACK_PROVIDER`
+- 真实 keys 写在 `backend/.env`（已 gitignored），样例见 `.env.docker.example`
+- Celery 任务通过 `services/llm/sync_helpers.py` 调用（`asyncio.run` 桥接）
+- 不影响 DashScope 路径，三者并存
+
+### 监控 / Prometheus
+
+后端启动自动挂 `/metrics`。四套业务指标在 `app/utils/metrics.py`：
+- `petpal_llm_calls_total{provider,model,outcome}` + `_duration_seconds`
+- `petpal_memory_writes_total{memory_type,source}` + 重要度直方图 + 检索耗时 + 抽取决策
+- `petpal_wrapped_generated_total{llm_used,outcome}` + cards / secrets 直方图
+- `petpal_asp_broadcast_total{event_type,outcome}` + active drivers gauge
+
+Prometheus + Grafana 一键起：`docker compose -f docker/observability/docker-compose.observability.yml up`。
+默认仪表盘已 provision（admin / petpal-grafana）。
+
 ### 前端 (`frontend/`)
 
 **技术栈**: Vue 3 + TypeScript + Vite + Vant 4（移动端 UI 组件库）+ Pinia

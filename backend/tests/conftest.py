@@ -12,6 +12,77 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+# 单测必须用本地 SQLite 内存库，避免命中真实 .env 配置的 MySQL
+os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret")
+os.environ.setdefault("SECRET_KEY", "test-app-secret")
+os.environ.setdefault("APP_ENV", "development")
+
+# SQLite 对 BigInteger 不 autoincrement —— 编译为 INTEGER 让单测可用
+from sqlalchemy.ext.compiler import compiles  # noqa: E402
+from sqlalchemy.types import BigInteger as _BI  # noqa: E402
+
+
+@compiles(_BI, "sqlite")
+def _bigint_to_integer_on_sqlite(element, compiler, **kw):
+    return "INTEGER"
+
+
+@pytest.fixture
+def db_session():
+    """每个测试一个全新的 in-memory SQLite session，自动建表 + 拆毁。"""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.database import Base
+    # 触发所有 model 注册到 Base.metadata
+    import app.models  # noqa: F401
+
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(bind=engine)
+    Session = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    session = Session()
+    try:
+        yield session
+    finally:
+        session.close()
+        Base.metadata.drop_all(bind=engine)
+        engine.dispose()
+
+
+@pytest.fixture
+def seed_user(db_session):
+    """插入一个最小可用的 user，返回其 id。"""
+    from app.models.user import User
+    u = User(
+        phone=f"139{abs(hash('petpal-test')) % 100000000:08d}",
+        nickname="测试主人",
+        password="test-hash",
+    )
+    db_session.add(u)
+    db_session.commit()
+    return u
+
+
+@pytest.fixture
+def seed_pet_avatar(db_session, seed_user):
+    """给 seed_user 插入一只 pet + 对应的 PetAvatar。"""
+    from app.models.pet import Pet
+    from app.models.avatar import PetAvatar
+    pet = Pet(owner_id=seed_user.id, name="豆包", pet_type="cat")
+    db_session.add(pet)
+    db_session.flush()
+    avatar = PetAvatar(
+        pet_id=pet.id, user_id=seed_user.id,
+        speaking_style="cute",
+        persona={"name": "豆包", "first_person_intro": "我是豆包"},
+    )
+    db_session.add(avatar)
+    db_session.commit()
+    return avatar
+
 
 @pytest.fixture
 def sample_image_bytes():
