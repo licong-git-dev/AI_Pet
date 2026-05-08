@@ -5,15 +5,16 @@ ARG VITE_API_BASE_URL=/api
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# 利用层缓存：先装依赖
+# 利用层缓存：先装依赖（强制 NODE_ENV=development 让 npm ci 一定装 devDeps）
 COPY package.json package-lock.json* ./
-RUN npm ci --no-audit --no-fund
+ENV NODE_ENV=development
+RUN npm ci --include=dev --no-audit --no-fund
 
-# 拷源码并构建
+# 拷源码并构建（用 npx 显式调用，规避 alpine 上 PATH 偶发问题）
 COPY . .
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
-RUN npm run build
+RUN npx --no-install vue-tsc --noEmit && npx --no-install vite build
 
 # ==================== 2. runtime 阶段 ====================
 FROM nginx:1.27-alpine AS runtime
