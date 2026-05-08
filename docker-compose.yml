@@ -20,6 +20,15 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-flash-latest}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - LLM_PRIMARY_PROVIDER=${LLM_PRIMARY_PROVIDER:-gemini}
+      - LLM_FALLBACK_PROVIDER=${LLM_FALLBACK_PROVIDER:-openai}
+      - MQTT_ENABLED=${MQTT_ENABLED:-false}
+      - MQTT_HOST=${MQTT_HOST:-mosquitto}
+      - MQTT_PORT=${MQTT_PORT:-1883}
       - ALIYUN_SMS_ACCESS_KEY_ID=${ALIYUN_SMS_ACCESS_KEY_ID}
       - ALIYUN_SMS_ACCESS_KEY_SECRET=${ALIYUN_SMS_ACCESS_KEY_SECRET}
       - OSS_ACCESS_KEY_ID=${OSS_ACCESS_KEY_ID}
@@ -60,6 +69,15 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - SECRET_KEY=${SECRET_KEY}
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-flash-latest}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - LLM_PRIMARY_PROVIDER=${LLM_PRIMARY_PROVIDER:-gemini}
+      - LLM_FALLBACK_PROVIDER=${LLM_FALLBACK_PROVIDER:-openai}
+      - MQTT_ENABLED=${MQTT_ENABLED:-false}
+      - MQTT_HOST=${MQTT_HOST:-mosquitto}
+      - MQTT_PORT=${MQTT_PORT:-1883}
     volumes:
       - backend_uploads:/app/uploads
       - backend_logs:/app/logs
