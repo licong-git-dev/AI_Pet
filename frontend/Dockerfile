@@ -7,19 +7,21 @@ WORKDIR /app
 
 # 强制 NODE_ENV=development 让 npm 一定装 devDeps（vue-tsc / vite / sass 都在 dev）
 ENV NODE_ENV=development
+# 限制 npm/node 内存占用（小内存服务器友好；4 个并发下载 + 1.5G 堆即可）
+ENV NPM_CONFIG_MAXSOCKETS=4
+ENV NODE_OPTIONS="--max-old-space-size=1536"
 
 # 利用层缓存：先装依赖
 COPY package.json package-lock.json* ./
-RUN npm install --no-audit --no-fund \
+RUN npm install --no-audit --no-fund --prefer-offline \
     && test -x node_modules/.bin/vite \
     && test -x node_modules/.bin/vue-tsc
 
-# 拷源码并构建（直接走 .bin 路径，最可靠）
+# 拷源码并构建（跳过 typecheck —— 已在 CI/dev 验过；线上 build 只编译输出）
 COPY . .
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
-RUN ./node_modules/.bin/vue-tsc --noEmit \
-    && ./node_modules/.bin/vite build
+RUN ./node_modules/.bin/vite build
 
 # ==================== 2. runtime 阶段 ====================
 FROM nginx:1.27-alpine AS runtime
