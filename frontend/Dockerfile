@@ -7,15 +7,17 @@ WORKDIR /app
 
 # 强制 NODE_ENV=development 让 npm 一定装 devDeps（vue-tsc / vite / sass 都在 dev）
 ENV NODE_ENV=development
-# 限制 npm/node 内存占用（小内存服务器友好；4 个并发下载 + 1.5G 堆即可）
-ENV NPM_CONFIG_MAXSOCKETS=4
-ENV NODE_OPTIONS="--max-old-space-size=1536"
+# 极致省内存：单线程 + 单 socket + 1G heap（针对 1.6GB RAM + swap 服务器）
+ENV NPM_CONFIG_MAXSOCKETS=2
+ENV NPM_CONFIG_JOBS=1
+ENV NODE_OPTIONS="--max-old-space-size=1024"
+
+# 让 .npmrc 进入容器（含 maxsockets=2 / fund=false 等限制）
+COPY package.json package-lock.json* .npmrc ./
 
 # 利用层缓存：先装依赖
-COPY package.json package-lock.json* ./
 RUN npm install --no-audit --no-fund --prefer-offline \
-    && test -x node_modules/.bin/vite \
-    && test -x node_modules/.bin/vue-tsc
+    && test -x node_modules/.bin/vite
 
 # 拷源码并构建（跳过 typecheck —— 已在 CI/dev 验过；线上 build 只编译输出）
 COPY . .
