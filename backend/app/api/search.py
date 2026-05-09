@@ -42,11 +42,13 @@ def _get_redis():
 
     try:
         import redis
-        _redis_client = redis.from_url(settings.redis_url, decode_responses=True)
-        _redis_client.ping()
+        client = redis.from_url(settings.redis_url, decode_responses=True)
+        client.ping()
+        _redis_client = client
         return _redis_client
     except Exception as e:
         logger.warning(f"Redis不可用，搜索历史使用内存存储: {e}")
+        _redis_client = None
         return None
 
 

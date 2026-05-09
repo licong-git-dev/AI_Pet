@@ -114,7 +114,8 @@ function logout() {
         WS: {{ status }}
       </div>
       <nav>
-        <router-link to="/wrapped">我的月报</router-link>
+        <router-link to="/me">画像</router-link>
+        <router-link to="/wrapped">月报</router-link>
         <button class="link" @click="logout">退出</button>
       </nav>
     </header>

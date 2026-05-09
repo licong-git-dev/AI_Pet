@@ -114,7 +114,8 @@ async def test_analyze_health_creates_no_records_when_points_insufficient(monkey
 @pytest.mark.asyncio
 async def test_analyze_health_success_deducts_points_and_returns_data(monkeypatch):
     db = DbStub(make_pet())
-    user = make_user(8)
+    # 普通用户健康分析成本 20 分；初始 20 → 扣 20 → 余 0（与下面断言一致）
+    user = make_user(20)
     request = HealthAnalysisRequest(pet_id=1, images=["https://example.com/cat.jpg"], description="眼睛发红")
 
     async def fake_analyze_pet_health(**kwargs):

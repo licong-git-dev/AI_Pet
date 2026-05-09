@@ -11,6 +11,10 @@ const router = createRouter({
     { path: '/room',    name: 'room',    component: () => import('@/views/AvatarRoomView.vue'), meta: { requiresAuth: true, tab: true } },
     { path: '/wrapped', name: 'wrapped', component: () => import('@/views/WrappedView.vue'),    meta: { requiresAuth: true, tab: true } },
 
+    // 记忆花园 + 主人画像
+    { path: '/memory',  name: 'memory',  component: () => import('@/views/MemoryGardenView.vue'), meta: { requiresAuth: true, tab: true } },
+    { path: '/me',      name: 'me',      component: () => import('@/views/OwnerProfileView.vue'),  meta: { requiresAuth: true } },
+
     // 宠物
     { path: '/pets',          name: 'pets',         component: () => import('@/views/PetListView.vue'),   meta: { requiresAuth: true, tab: true } },
     { path: '/pets/new',      name: 'pet-create',   component: () => import('@/views/PetCreateView.vue'), meta: { requiresAuth: true } },

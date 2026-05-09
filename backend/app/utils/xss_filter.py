@@ -86,12 +86,20 @@ def clean_html(
     attrs = allowed_attributes or ALLOWED_ATTRIBUTES
 
     if BLEACH_AVAILABLE:
-        return bleach.clean(
+        # bleach 会保留 <script> 内的文本（"alert('XSS')"），即使 tag 被 strip 掉。
+        # 这里先把已知会"暴露脚本文本"的标签整体删掉（含内容），再走 bleach。
+        cleaned = re.sub(
+            r"<\s*(script|style|iframe|object|embed)\b[^>]*>.*?<\s*/\s*\1\s*>",
+            "",
             html,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        return bleach.clean(
+            cleaned,
             tags=tags,
             attributes=attrs,
             protocols=ALLOWED_PROTOCOLS,
-            strip=strip
+            strip=strip,
         )
     else:
         # 简单实现：移除所有HTML标签
@@ -135,13 +143,14 @@ def escape_html(text: Optional[str]) -> Optional[str]:
     return html_escape(text, quote=True)
 
 
-def sanitize_text(text: Optional[str]) -> Optional[str]:
+def sanitize_text(text: Optional[str], max_length: Optional[int] = None) -> Optional[str]:
     """清理纯文本内容
 
     用于用户昵称、宠物名称等不应包含HTML的字段
 
     Args:
         text: 要清理的文本
+        max_length: 可选最大长度（截断而非报错）
 
     Returns:
         清理后的文本
@@ -159,7 +168,10 @@ def sanitize_text(text: Optional[str]) -> Optional[str]:
     # 移除控制字符（保留换行和制表符）
     text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
 
-    return text.strip()
+    text = text.strip()
+    if max_length is not None and len(text) > max_length:
+        text = text[:max_length]
+    return text
 
 
 def sanitize_url(url: Optional[str]) -> Optional[str]:
@@ -179,16 +191,16 @@ def sanitize_url(url: Optional[str]) -> Optional[str]:
     # 检查协议
     url_lower = url.lower()
     if url_lower.startswith('javascript:'):
-        return None
+        return ''
     if url_lower.startswith('vbscript:'):
-        return None
+        return ''
     if url_lower.startswith('data:') and not url_lower.startswith('data:image/'):
-        return None
+        return ''
 
     # 检查危险模式
     for pattern in DANGEROUS_PATTERNS:
         if re.search(pattern, url, re.IGNORECASE):
-            return None
+            return ''
 
     return url
 
@@ -217,39 +229,35 @@ def sanitize_filename(filename: Optional[str]) -> Optional[str]:
     return filename.strip('._')
 
 
-def check_content_safety(content: Optional[str]) -> dict:
+def check_content_safety(content: Optional[str]) -> tuple:
     """检查内容安全性
 
     Args:
         content: 要检查的内容
 
     Returns:
-        安全检查结果
+        (is_safe: bool, issues: List[str])
+        is_safe 为 True 表示未命中任何危险模式 / 可疑关键词。
     """
-    result = {
-        "is_safe": True,
-        "warnings": [],
-        "dangerous_patterns": []
-    }
+    issues: List[str] = []
 
     if not content:
-        return result
+        return True, issues
 
     content_lower = content.lower()
 
     # 检查危险模式
     for pattern in DANGEROUS_PATTERNS:
         if re.search(pattern, content, re.IGNORECASE):
-            result["is_safe"] = False
-            result["dangerous_patterns"].append(pattern)
+            issues.append(f"危险模式: {pattern}")
 
     # 检查可疑关键词
     suspicious_words = ['<script', 'javascript:', 'onclick', 'onerror', 'eval(']
     for word in suspicious_words:
         if word in content_lower:
-            result["warnings"].append(f"发现可疑内容: {word}")
+            issues.append(f"可疑关键词: {word}")
 
-    return result
+    return len(issues) == 0, issues
 
 
 class ContentSanitizer:
@@ -293,3 +301,19 @@ class ContentSanitizer:
         # 移除特殊字符
         query = re.sub(r'[<>"\';\\]', '', query)
         return query.strip()[:100]  # 限制长度
+
+    @staticmethod
+    def sanitize_dict(data: dict, fields: Optional[List[str]] = None) -> dict:
+        """对字典里的指定字段做 HTML 清理；未指定字段则全部 string 字段都清理。
+
+        非 string 值（嵌套 dict / list / int / None）原样保留；这是个浅清理，
+        用于"接收用户提交的 form payload"前最后一道防线。
+        """
+        if not isinstance(data, dict):
+            return data
+        keys = fields if fields is not None else [k for k, v in data.items() if isinstance(v, str)]
+        out = dict(data)
+        for k in keys:
+            if k in out and isinstance(out[k], str):
+                out[k] = clean_html(out[k])
+        return out

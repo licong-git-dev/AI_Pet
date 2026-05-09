@@ -4,11 +4,11 @@ import { useRoute, RouterLink } from 'vue-router'
 const route = useRoute()
 
 const tabs = [
-  { to: '/feed',   label: '社区', icon: '🐾' },
-  { to: '/shop',   label: '商城', icon: '🛍️' },
-  { to: '/room',   label: '分身', icon: '✨' },
-  { to: '/pets',   label: '我的宠物', icon: '🐱' },
-  { to: '/wrapped', label: '月报',   icon: '📜' },
+  { to: '/feed',   label: '社区',     icon: '🐾' },
+  { to: '/room',   label: '分身',     icon: '✨' },
+  { to: '/memory', label: '记忆花园', icon: '🌳' },
+  { to: '/wrapped', label: '月报',    icon: '📜' },
+  { to: '/pets',   label: '宠物',     icon: '🐱' },
 ]
 function active(to: string): boolean {
   return route.path === to || (to !== '/' && route.path.startsWith(to))
